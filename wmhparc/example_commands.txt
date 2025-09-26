@@ -1,0 +1,10 @@
+conda activate wmhparc
+
+python run_parcellation.py \
+-i /home/s2208943/wmhparc_test/images/NACC788408_3-08-2022_T1w_T1w_0.nii.gz \
+-b /home/s2208943/wmhparc_test/images/NACC788408_3-08-2022_T1w_T1w_0_synthstripmask.nii.gz \
+-s /home/s2208943/wmhparc_test/images/NACC788408_3-08-2022_T1w_T1w_0_synthseg.nii.gz \
+-t /home/s2208943/wmhparc_test/atlas/template_73y_normalized.nii.gz \
+-a /home/s2208943/wmhparc_test/atlas/atlas_bgit.nii.gz \
+-w /home/s2208943/wmhparc_test/images/SCAN_NACC788408_3-08-2022_FLAIR_FLAIR_0_seg_high_clamp_bce_sgd05.nii.gz \
+-o /home/s2208943/wmhparc_test/outputs2/
