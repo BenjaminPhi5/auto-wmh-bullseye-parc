@@ -11,14 +11,16 @@ import argparse
 
 def construct_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', required=True, type=str, description="path to the anatomical subject image of interest (e.g T1w or FLAIR image)")
-    parser.add_argument('-b', required=True, type=str, description="path to the brainmask (ICV) file of the subject image")
-    parser.add_argument('-s', required=True, type=str, description="path to the SynthSeg output of the subject anaotmical image")
-    parser.add_argument('-t', required=True, type=str, description="path to the 73yr T1w template image")
-    parser.add_argument('-a', required=True, type=str, description="path to the brainlobe atlas")
-    parser.add_argument('-tb', default=None, type=str, description="path to the brainmask (ICV) for the template image")
-    parser.add_argument('-w', required=True, type=str, description="path to the WMH segmentation file")
-    parser.add_argument('-o', required=True, type=str, description="output folder to save results to")
+    parser.add_argument('-i', '--image', required=True, type=str, help="path to the anatomical subject image of interest (e.g T1w or FLAIR image)")
+    parser.add_argument('-b', '--brainmask', required=True, type=str, help="path to the brainmask (ICV) file of the subject image")
+    parser.add_argument('-s', '--synthseg', required=True, type=str, help="path to the SynthSeg output of the subject anaotmical image")
+    parser.add_argument('-t', '--template', required=True, type=str, help="path to the 73yr T1w template image")
+    parser.add_argument('-a', '--atlas', required=True, type=str, help="path to the brainlobe atlas")
+    parser.add_argument('-tb', '--template_brainmask', default=None, type=str, help="path to the brainmask (ICV) for the template image")
+    parser.add_argument('-w', '--wmh_seg', required=True, type=str, help="path to the WMH segmentation file")
+    parser.add_argument('-o', '--output_folder', required=True, type=str, help="output folder to save results to")
+
+    return parser
 
 def register_and_apply(image, template, atlas, output_folder, image_mask=None, template_mask=None):
 
@@ -34,7 +36,7 @@ def register_and_apply(image, template, atlas, output_folder, image_mask=None, t
     print("transformed atlas saved to: ", out_image)
     return out_image 
 
-def compute_concentric_layers(synthseg, brainmask, output_folder):
+def compute_concentric_layers(image, synthseg, brainmask, output_folder):
     print("computing ventricle and cortex distance transforms")
     ventmap_outimage, cortexmap_outimage = postprocess_synthseg(image, synthseg, output_folder)
 
@@ -44,17 +46,23 @@ def compute_concentric_layers(synthseg, brainmask, output_folder):
     return pv_rings_file
 
 def main(args):
+
+    if not os.path.exists(args.output_folder):
+        os.makedirs(args.output_folder, exist_ok=True)
+    
     # registration
-    registered_atlas_file = register_and_apply(args.i, args.t, args.a, args.o, mask=args.b, moving_mask=args.tb)
+    registered_atlas_file = register_and_apply(args.image, args.template, args.atlas, args.output_folder, image_mask=args.brainmask, template_mask=args.template_brainmask)
 
     # create concentric rings
-    pv_rings_file = compute_concentric_layers(args.s, args.b, args.o)
+    pv_rings_file = compute_concentric_layers(args.image, args.synthseg, args.brainmask, args.output_folder)
 
     # create bullseye parcellation image
     parc_file = save_brain_parcellation_image(registered_atlas_file, pv_rings_file)
 
     # calculate parcellation stats
-    calc_parc_stats(args.i, parc_file, args.w)
+    df = calc_parc_stats(args.image, parc_file, args.wmh_seg)
+
+    df.to_csv(parc_file.split(".nii")[0] + "_wmh_vols.csv")
 
 if __name__ == '__main__':
     parser = construct_parser()
