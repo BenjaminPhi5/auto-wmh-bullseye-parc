@@ -5,13 +5,15 @@ import subprocess
 def load_image(filepath):
     return sitk.GetArrayFromImage(sitk.ReadImage(filepath))
 
-def save_manipulated_sitk_image_array(source_image, target_array, filepath):
+def save_manipulated_sitk_image_array(source_image, target_array, filepath, cast_float32=False):
     """Saves a manipulated nifti image array using the meta data information from a source image"""
     target_image = sitk.GetImageFromArray(target_array)
     target_image.SetSpacing(source_image.GetSpacing())
     target_image.SetOrigin(source_image.GetOrigin())
     target_image.SetDirection(source_image.GetDirection())
     target_image.CopyInformation(source_image)
+    if cast_float32:
+        target_image = sitk.Cast(target_image, sitk.sitkFloat32)
     sitk.WriteImage(target_image, filepath)
 
 def resample_match_if_necessary(fixed, moving, use_nearest_neighbor=False):

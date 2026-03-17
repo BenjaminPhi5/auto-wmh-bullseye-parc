@@ -17,14 +17,18 @@ def construct_parser():
     parser.add_argument('-t', '--template', required=True, type=str, help="path to the 73yr T1w template image")
     parser.add_argument('-a', '--atlas', required=True, type=str, help="path to the brainlobe atlas")
     parser.add_argument('-tb', '--template_brainmask', default=None, type=str, help="path to the brainmask (ICV) for the template image")
-    parser.add_argument('-w', '--wmh_seg', required=True, type=str, help="path to the WMH segmentation file")
+    parser.add_argument('-w', '--wmh_seg', required=False, type=str, help="optional - path to the WMH segmentation file for calculating WMH volumes in each region", default=None)
     parser.add_argument('-o', '--output_folder', required=True, type=str, help="output folder to save results to")
-
+    parser.add_argument('--no_reg', action='store_true', help='skip the registration stage, assume registration has already been completed')
+    
     return parser
 
-def register_and_apply(image, template, atlas, output_folder, image_mask=None, template_mask=None):
+def register_and_apply(image, template, atlas, output_folder, image_mask=None, template_mask=None, return_outpath_only=False):
 
     out_image = os.path.join(output_folder, image.split(os.path.sep)[-1].split(".nii")[0] + "_lobe_atlas.nii.gz")
+    if return_outpath_only:
+        return out_image
+        
     run_ants_SyNAggro(fixed=image, moving=template, out=out_image, outsuffix="template_synaggro", mask=image_mask, moving_mask=template_mask)
 
     affine_transform = out_image.split(".nii")[0] + "_template_synaggro_0GenericAffine.mat"
@@ -38,10 +42,15 @@ def register_and_apply(image, template, atlas, output_folder, image_mask=None, t
 
 def compute_concentric_layers(image, synthseg, brainmask, output_folder):
     print("computing ventricle and cortex distance transforms")
-    ventmap_outimage, cortexmap_outimage = postprocess_synthseg(image, synthseg, output_folder)
+    ventmap_outimage, cortexmap_outimage, synthseg_isotropic_outimage = postprocess_synthseg(image, synthseg, output_folder)
 
     print("creating concentric layers images")
     pv_rings_file = create_pv_dist_ring_file(image, synthseg, ventmap_outimage, cortexmap_outimage, brainmask, output_folder)
+
+    # delete distance transform files and synthseg isotropic file
+    os.remove(synthseg_isotropic_outimage)
+    os.remove(ventmap_outimage)
+    os.remove(cortexmap_outimage)
 
     return pv_rings_file
 
@@ -51,18 +60,20 @@ def main(args):
         os.makedirs(args.output_folder, exist_ok=True)
     
     # registration
-    registered_atlas_file = register_and_apply(args.image, args.template, args.atlas, args.output_folder, image_mask=args.brainmask, template_mask=args.template_brainmask)
+    registered_atlas_file = register_and_apply(args.image, args.template, args.atlas, args.output_folder, image_mask=args.brainmask, template_mask=args.template_brainmask, return_outpath_only=args.no_reg)
 
     # create concentric rings
     pv_rings_file = compute_concentric_layers(args.image, args.synthseg, args.brainmask, args.output_folder)
+    
 
     # create bullseye parcellation image
     parc_file = save_brain_parcellation_image(registered_atlas_file, pv_rings_file)
 
     # calculate parcellation stats
-    df = calc_parc_stats(args.image, parc_file, args.wmh_seg)
+    if args.wmh_seg is not None:
+        df = calc_parc_stats(args.image, parc_file, args.wmh_seg)
 
-    df.to_csv(parc_file.split(".nii")[0] + "_wmh_vols.csv")
+        df.to_csv(parc_file.split(".nii")[0] + "_wmh_vols.csv")
 
 if __name__ == '__main__':
     parser = construct_parser()

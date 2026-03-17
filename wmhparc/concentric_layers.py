@@ -25,7 +25,7 @@ def create_ventricle_distance_map(synthseg_file, outfile_ventricle, outfile_cort
     and creates a euclidian distance map from each voxel to the ventricles.
     This distance map is then saved under the name out_file
     """
-    
+
     synthseg_img = sitk.ReadImage(synthseg_file)
     
     spacing = synthseg_img.GetSpacing()
@@ -38,7 +38,7 @@ def create_ventricle_distance_map(synthseg_file, outfile_ventricle, outfile_cort
         save_manipulated_sitk_image_array(synthseg_img, distance_map, outfile)
     
     synthseg = sitk.GetArrayFromImage(synthseg_img)
-    vent_dist = extract_distance((synthseg == VENTRICLE_1) | (synthseg == VENTRICLE_2) | (synthseg == VENTRICLE_INFERIOR_L) | (synthseg == VENTRICLE_INFERIOR_R), outfile_ventricle)
+    extract_distance((synthseg == VENTRICLE_1) | (synthseg == VENTRICLE_2) | (synthseg == VENTRICLE_INFERIOR_L) | (synthseg == VENTRICLE_INFERIOR_R), outfile_ventricle)
     extract_distance((synthseg == CORTEX_1) | (synthseg == CORTEX_2) | (synthseg == CORTEX_3) | (synthseg == CORTEX_4) | (synthseg > CORTEX_PARC), outfile_cortex)
 
 def postprocess_synthseg(in_image, synthseg_outimage, out_folder):
@@ -52,23 +52,24 @@ def postprocess_synthseg(in_image, synthseg_outimage, out_folder):
     in_imagename = in_image.split(".nii")[0].split("/")[-1]
     in_filetype = fileending(in_image)
     ventmap_outimage = os.path.join(out_folder, in_imagename + "_ventdist" + in_filetype)
+    synthseg_isotropic_outimage = os.path.join(out_folder, in_imagename + "_synthsegisotropic" + in_filetype)
     cortexmap_outimage = os.path.join(out_folder, in_imagename + "_cortexdist" + in_filetype)
 
     # ensure the synthseg image is in 1x1x1 space
     command = [
         "mri_convert", "-vs", "1", "1", "1", "-rt", "nearest",
-        synthseg_outimage, ventmap_outimage
+        synthseg_outimage, synthseg_isotropic_outimage
     ]
     _ = subprocess.call(command, stdout=subprocess.DEVNULL)
     
     # create ventricle distance map imag
-    create_ventricle_distance_map(ventmap_outimage, ventmap_outimage, cortexmap_outimage)
+    create_ventricle_distance_map(synthseg_isotropic_outimage, ventmap_outimage, cortexmap_outimage)
 
     # resample the output images back to the space of the in_image
     resample_match_if_necessary(in_image, ventmap_outimage, use_nearest_neighbor=False)
     resample_match_if_necessary(in_image, cortexmap_outimage, use_nearest_neighbor=False)
 
-    return ventmap_outimage, cortexmap_outimage
+    return ventmap_outimage, cortexmap_outimage, synthseg_isotropic_outimage
 
 """
 calculates the ventricle rings (rings of distance from the ventricles for a brain mri image (preferably a t1 image)
