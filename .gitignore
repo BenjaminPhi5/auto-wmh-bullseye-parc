@@ -7,6 +7,9 @@
 # authentication information
 authentication.txt
 
+# testing folder
+test/
+
 # torch checkpoints
 *.ckpt
 *.pt
